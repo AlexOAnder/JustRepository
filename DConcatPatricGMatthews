@@ -1,5 +1,7 @@
 ' Function by Patrick G. Matthews, basically embellishing an approach seen in many
-' incarnations over the years. Thanks Him for that wonderful function of the str concat in ACCESS SQL
+' incarnations over the years.
+' Thanks Him for that wonderful function of the str concat in ACCESS SQL
+` I just copied that in my repository for saving.
 ' Original - https://www.experts-exchange.com/articles/2380/Domain-Aggregate-for-Concatenating-Values-by-Group-in-Microsoft-Access.html
 
 Function DConcat(ConcatColumns As String, Tbl As String, Optional Criteria As String = "", _
