@@ -1,0 +1,111 @@
+' Function by Patrick G. Matthews, basically embellishing an approach seen in many
+' incarnations over the years. Thanks Him for that wonderful function of the str concat in ACCESS SQL
+' Original - https://www.experts-exchange.com/articles/2380/Domain-Aggregate-for-Concatenating-Values-by-Group-in-Microsoft-Access.html
+
+Function DConcat(ConcatColumns As String, Tbl As String, Optional Criteria As String = "", _
+    Optional Delimiter1 As String = ", ", Optional Delimiter2 As String = ", ", _
+    Optional Distinct As Boolean = True, Optional Sort As String = "Asc", _
+    Optional Limit As Long = 0)
+    
+    ' Function by Patrick G. Matthews, basically embellishing an approach seen in many
+    ' incarnations over the years
+    
+    ' Requires reference to Microsoft DAO library
+    
+    ' This function is intended as a "domain aggregate" that concatenates (and delimits) the
+    ' various values rather than the more usual Count, Sum, Min, Max, etc.  For example:
+    '
+    '    Select Field1, DConcat("Field2", "SomeTable", "[Field1] = '" & Field1 & "'") AS List
+    '    FROM SomeTable
+    '    GROUP BY Field1
+    '
+    ' will return the distinct values of Field1, along with a concatenated list of all the
+    ' distinct Field2 values associated with each Field1 value.
+    
+    ' ConcatColumns is a comma-delimited list of columns to be concatenated (typically just
+    '   one column, but the function accommodates multiple).  Place field names in square
+    '   brackets if they do not meet the customary rules for naming DB objects
+    ' Tbl is the table/query the data are pulled from.  Place table name in square brackets
+    '   if they do not meet the customary rules for naming DB objects
+    ' Criteria (optional) are the criteria to be applied in the grouping.  Be sure to use And
+    '   or Or as needed to build the right logic, and to encase text values in single quotes
+    '   and dates in #
+    ' Delimiter1 (optional) is the delimiter used in the concatenation (default is ", ").
+    '   Delimiter1 is applied to each row in the code query's result set
+    ' Delimiter2 (optional) is the delimiter used in concatenating each column in the result
+    '   set if ConcatColumns specifies more than one column (default is ", ")
+    ' Distinct (optional) determines whether the distinct values are concatenated (True,
+    '   default), or whether all values are concatenated (and thus may get repeated)
+    ' Sort (optional) indicates whether the concatenated string is sorted, and if so, if it is
+    '   Asc or Desc.  Note that if ConcatColumns has >1 column and you use Desc, only the last
+    '   column gets sorted
+    ' Limit (optional) places a limit on how many items are placed into the concatenated string.
+    '   The Limit argument works as a TOP N qualifier in the SELECT clause
+    
+    Dim rs As DAO.Recordset
+    Dim SQL As String
+    Dim ThisItem As String
+    Dim FieldCounter As Long
+    
+    On Error GoTo ErrHandler
+    
+    ' Initialize to Null
+    
+    DConcat = Null
+    
+    ' Build up a query to grab the information needed for the concatenation
+    
+    SQL = "SELECT " & IIf(Distinct, "DISTINCT ", "") & _
+            IIf(Limit > 0, "TOP " & Limit & " ", "") & _
+            ConcatColumns & " " & _
+        "FROM " & Tbl & " " & _
+        IIf(Criteria <> "", "WHERE " & Criteria & " ", "") & _
+        Switch(Sort = "Asc", "ORDER BY " & ConcatColumns & " Asc", _
+            Sort = "Desc", "ORDER BY " & ConcatColumns & " Desc", True, "")
+        
+    ' Open the recordset and loop through it:
+    ' 1) Concatenate each column in each row of the recordset
+    ' 2) Concatenate the resulting concatenated rows in the function's return value
+    
+    Set rs = CurrentDb.OpenRecordset(SQL)
+    With rs
+        Do Until .EOF
+            
+            ' Initialize variable for this row
+            
+            ThisItem = ""
+            
+            ' Concatenate columns on this row
+            
+            For FieldCounter = 0 To rs.Fields.Count - 1
+                ThisItem = ThisItem & Delimiter2 & Nz(rs.Fields(FieldCounter).Value, "")
+            Next
+            
+            ' Trim leading delimiter
+            
+            ThisItem = Mid(ThisItem, Len(Delimiter2) + 1)
+            
+            ' Concatenate row result to function return value
+            
+            DConcat = Nz(DConcat, "") & Delimiter1 & ThisItem
+            .MoveNext
+        Loop
+        .Close
+    End With
+    
+    ' Trim leading delimiter
+    
+    If Not IsNull(DConcat) Then DConcat = Mid(DConcat, Len(Delimiter1) + 1)
+    
+    GoTo Cleanup
+
+ErrHandler:
+    
+    ' Error is most likely an invalid database object name, or bad syntax in the Criteria
+    
+    DConcat = CVErr(Err.Number)
+    
+Cleanup:
+    Set rs = Nothing
+    
+End Function
